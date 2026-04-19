@@ -18,7 +18,6 @@
 # LAN IP, DHCP-сервер, NAT — нічого з цього не буде.
 #
 # Що робить скрипт поверх defaults:
-#   - Встановлює пароль admin = 12345678
 #   - Виносить ether2 з bridge і додає його у список WAN
 #   - Підключає DHCP-клієнт на ether2
 #   - Переналаштовує DHCP-клієнт ether1: БЕЗ add-default-route
@@ -33,31 +32,25 @@
 # =============================================================================
 
 # -----------------------------------------------------------------------------
-# 1. Пароль admin та ім'я пристрою
-# -----------------------------------------------------------------------------
-/user set [find name=admin] password="12345678"
-/system identity set name=RB4011-lab
-
-# -----------------------------------------------------------------------------
-# 2. Виносимо ether2 із дефолтного bridge, бо він буде WAN2
+# 1. Виносимо ether2 із дефолтного bridge, бо він буде WAN2
 # -----------------------------------------------------------------------------
 /interface bridge port
 remove [find interface=ether2]
 
 # -----------------------------------------------------------------------------
-# 3. Додаємо ether2 у список WAN
+# 2. Додаємо ether2 у список WAN
 #    (ether1 уже в WAN за дефолтом; bridge уже в LAN)
 # -----------------------------------------------------------------------------
 /interface list member
 add interface=ether2 list=WAN comment="WAN2 backup"
 
 # -----------------------------------------------------------------------------
-# 4. Статичні DNS-сервери для роутера
+# 3. Статичні DNS-сервери для роутера
 # -----------------------------------------------------------------------------
 /ip dns set servers=1.1.1.1,8.8.8.8
 
 # -----------------------------------------------------------------------------
-# 5. Failover routing — скрипти з динамічним шлюзом
+# 4. Failover routing — скрипти з динамічним шлюзом
 #
 # Як працює:
 #   - Default route прямо на gateway ISP з прив'язкою до інтерфейсу (%ether1/2).
@@ -82,7 +75,7 @@ add name=wan1-route-update source=":local gw [/ip dhcp-client get [find interfac
 add name=wan2-route-update source=":local gw [/ip dhcp-client get [find interface=ether2] gateway]\r\n:if (\$gw != \"\") do={\r\n    :local gwIface (\$gw . \"%ether2\")\r\n    /ip route remove [find comment=\"default via WAN2 (backup)\"]\r\n    /ip route add dst-address=0.0.0.0/0 gateway=\$gwIface distance=2 check-gateway=ping comment=\"default via WAN2 (backup)\"\r\n}"
 
 # -----------------------------------------------------------------------------
-# 6. DHCP-клієнти на обох WAN
+# 5. DHCP-клієнти на обох WAN
 #    - add-default-route=no — маршрути управляємо через скрипти вище
 #    - use-peer-dns=no — не пускаємо провайдерські DNS у /ip dns
 #    - script= — викликається при кожній зміні стану (bound / renew / unbound)
@@ -96,7 +89,7 @@ add interface=ether2 add-default-route=no use-peer-dns=no use-peer-ntp=no disabl
 /system script run wan2-route-update
 
 # -----------------------------------------------------------------------------
-# 7. Час
+# 6. Час
 # -----------------------------------------------------------------------------
 /system clock set time-zone-name=Europe/Kiev
 /system ntp client set enabled=yes
