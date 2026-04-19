@@ -3,25 +3,27 @@
 # Базове налаштування 2xWAN (DHCP) з failover ПОВЕРХ заводських defaults.
 # -----------------------------------------------------------------------------
 # Робочий цикл для тестування:
-#   1) /system reset-configuration no-defaults=no skip-backup=no
-#      (роутер перезавантажиться й застосує стандартну заводську конфігурацію)
-#   2) Після ребуту зайди у WinBox/SSH за адресою 192.168.88.1 з LAN-порту
-#      (ether2..ether10). Логін: admin, пароль порожній (спершу спитає задати).
-#      Якщо WinBox питає "Remove configuration" — НАТИСНИ "OK" лише якщо хочеш
-#      прибрати defaults. Нам defaults потрібні, тому натискай вгорі "X"
-#      (або просто пропусти це вікно).
-#   3) Залий цей файл на роутер (Files -> drag&drop, або scp):
+#   1) Скинь на завод (роутер перезавантажиться):
+#        /system reset-configuration no-defaults=no skip-backup=yes
+#   2) Після ребуту підключись до 192.168.88.1 з LAN-порту (ether2..ether10).
+#      Логін: admin, пароль порожній.
+#      Якщо WinBox питає "Remove configuration" — натисни "X" (НЕ "OK").
+#   3) Залий цей файл на роутер:
 #        scp mikrotik-failover.rsc admin@192.168.88.1:mikrotik-failover.rsc
 #   4) У терміналі роутера:
 #        /import file-name=mikrotik-failover.rsc verbose=yes
+#
+# ЧОМУ НЕ run-after-reset: цей скрипт — overlay поверх заводських defaults.
+# run-after-reset ЗАМІНЮЄ дефолтну конфігурацію (не доповнює), тому bridge,
+# LAN IP, DHCP-сервер, NAT — нічого з цього не буде.
 #
 # Що робить скрипт поверх defaults:
 #   - Встановлює пароль admin = 12345678
 #   - Виносить ether2 з bridge і додає його у список WAN
 #   - Підключає DHCP-клієнт на ether2
-#   - Переналаштовує DHCP-клієнт ether1: БЕЗ add-default-route (бо дефолти
-#     додамо руками з check-gateway=ping для реального failover)
-#   - Додає recursive-маршрути: WAN1 -> distance=1, WAN2 -> distance=2
+#   - Переналаштовує DHCP-клієнт ether1: БЕЗ add-default-route
+#   - Probe-маршрути та дефолти прописуються ДИНАМІЧНО через DHCP-скрипти
+#     (шлюз читається з /ip dhcp-client, тому працює при будь-яких IP від ISP)
 #   - Фіксує DNS-сервери роутера (щоб не залежали від провайдера при failover)
 #   - Ім'я пристрою, таймзона, NTP
 #
@@ -50,42 +52,48 @@ remove [find interface=ether2]
 add interface=ether2 list=WAN comment="WAN2 backup"
 
 # -----------------------------------------------------------------------------
-# 4. DHCP-клієнти на обох WAN
-#    - На ether1 дефолтний DHCP-клієнт вже існує: правимо його (не додаємо!).
-#    - add-default-route=no — дефолтні маршрути додамо руками нижче, щоб
-#      мати check-gateway=ping для failover (на DHCP-маршрутах його немає).
-#    - use-peer-dns=no — не пускаємо провайдерські DNS у /ip dns, щоб при
-#      перемиканні WAN DNS не "плавали".
-# -----------------------------------------------------------------------------
-/ip dhcp-client
-set [find interface=ether1] add-default-route=no use-peer-dns=no use-peer-ntp=no comment="WAN1"
-add interface=ether2 add-default-route=no use-peer-dns=no use-peer-ntp=no disabled=no comment="WAN2"
-
-# -----------------------------------------------------------------------------
-# 5. Статичні DNS-сервери для роутера (LAN-клієнти звертаються на 192.168.88.1)
+# 4. Статичні DNS-сервери для роутера
 # -----------------------------------------------------------------------------
 /ip dns set servers=1.1.1.1,8.8.8.8
 
 # -----------------------------------------------------------------------------
-# 6. Failover через recursive routing + check-gateway=ping
+# 5. Failover routing — скрипти з динамічним шлюзом
 #
 # Як працює:
-#   - Для кожного WAN жорстко прив'язуємо "probe"-адресу (1.1.1.1 через ether1,
-#     8.8.8.8 через ether2) з вузьким scope=10. Ці маршрути резолвляться
-#     через gateway, що приходить по DHCP (динамічний connected route).
-#   - Дефолтні маршрути дивляться на ці probe-адреси (target-scope=10) з
-#     check-gateway=ping. Поки probe пінгується — дефолт активний.
+#   - Default route прямо на gateway ISP з прив'язкою до інтерфейсу (%ether1/2).
+#     Прив'язка необхідна, бо обидва TP-Link можуть мати однаковий IP (192.168.0.1):
+#     без неї RouterOS балансує між ether1/ether2 (ECMP).
+#   - check-gateway=ping моніторить доступність gateway. Якщо TP-Link недоступний —
+#     маршрут деактивується і трафік переходить на резервний WAN.
 #   - distance=1 (WAN1) пріоритетний, distance=2 (WAN2) — резерв.
-#   - Падіння provider-side (коли лінк є, а інтернету немає) теж ловиться,
-#     бо check-gateway=ping пінгує реальну адресу в інтернеті.
+#   - ОБМЕЖЕННЯ: check-gateway=ping пінгує TP-Link (не ISP). Якщо TP-Link живий,
+#     але ISP впав — автоперемикання НЕ відбудеться. Для виробничого середовища
+#     потрібен окремий скрипт моніторингу інтернету.
+#
+# ЧОМУ НЕ recursive routing (через 1.1.1.1): RouterOS 7 не підтримує
+# check-gateway=ping з non-connected gateway — immediate-gw залишається порожнім
+# і маршрут завжди Is (Inactive).
+#
+# Скрипти визначаємо ДО налаштування DHCP-клієнтів, щоб при першому ж
+# bind-евенті вони вже існували в системі.
 # -----------------------------------------------------------------------------
-/ip route
-add dst-address=1.1.1.1/32 gateway=ether1 scope=10 comment="probe via WAN1"
-add dst-address=8.8.8.8/32 gateway=ether2 scope=10 comment="probe via WAN2"
-add dst-address=0.0.0.0/0 gateway=1.1.1.1 distance=1 check-gateway=ping \
-    target-scope=10 comment="default via WAN1 (primary)"
-add dst-address=0.0.0.0/0 gateway=8.8.8.8 distance=2 check-gateway=ping \
-    target-scope=10 comment="default via WAN2 (backup)"
+/system script
+add name=wan1-route-update source=":local gw [/ip dhcp-client get [find interface=ether1] gateway]\r\n:if (\$gw != \"\") do={\r\n    :local gwIface (\$gw . \"%ether1\")\r\n    /ip route remove [find comment=\"default via WAN1 (primary)\"]\r\n    /ip route add dst-address=0.0.0.0/0 gateway=\$gwIface distance=1 check-gateway=ping comment=\"default via WAN1 (primary)\"\r\n}"
+add name=wan2-route-update source=":local gw [/ip dhcp-client get [find interface=ether2] gateway]\r\n:if (\$gw != \"\") do={\r\n    :local gwIface (\$gw . \"%ether2\")\r\n    /ip route remove [find comment=\"default via WAN2 (backup)\"]\r\n    /ip route add dst-address=0.0.0.0/0 gateway=\$gwIface distance=2 check-gateway=ping comment=\"default via WAN2 (backup)\"\r\n}"
+
+# -----------------------------------------------------------------------------
+# 6. DHCP-клієнти на обох WAN
+#    - add-default-route=no — маршрути управляємо через скрипти вище
+#    - use-peer-dns=no — не пускаємо провайдерські DNS у /ip dns
+#    - script= — викликається при кожній зміні стану (bound / renew / unbound)
+# -----------------------------------------------------------------------------
+/ip dhcp-client
+set [find interface=ether1] add-default-route=no use-peer-dns=no use-peer-ntp=no comment="WAN1" script="/system script run wan1-route-update"
+add interface=ether2 add-default-route=no use-peer-dns=no use-peer-ntp=no disabled=no comment="WAN2" script="/system script run wan2-route-update"
+
+# Запускаємо одразу — для випадку, коли DHCP-клієнти вже були bound до імпорту
+/system script run wan1-route-update
+/system script run wan2-route-update
 
 # -----------------------------------------------------------------------------
 # 7. Час
@@ -98,11 +106,9 @@ add address=pool.ntp.org
 # =============================================================================
 # Перевірка після /import:
 #   /ip dhcp-client print
-#       -> обидва клієнти у стані "bound", мають IP
+#       -> обидва клієнти у стані "bound", мають IP + gateway
 #   /ip route print where dst-address=0.0.0.0/0
 #       -> два дефолти; активний має прапор "A S", резервний просто "S"
-#   /ip route print where dst-address~"1.1.1.1|8.8.8.8"
-#       -> два probe-маршрути, обидва "A S"
 #   /tool traceroute 8.8.8.8
 #       -> видно, через який аплінк іде трафік
 #
