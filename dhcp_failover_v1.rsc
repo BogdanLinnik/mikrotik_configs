@@ -5,13 +5,14 @@
 # Робочий цикл для тестування:
 #   1) Скинь на завод (роутер перезавантажиться):
 #        /system reset-configuration no-defaults=no skip-backup=yes
-#   2) Після ребуту підключись до 192.168.88.1 з LAN-порту (ether2..ether10).
-#      Логін: admin, пароль порожній.
-#      Якщо WinBox питає "Remove configuration" — натисни "X" (НЕ "OK").
+#   2) Після ребуту підключись до 192.168.88.1 з LAN-порту (ether3..ether10).
+#      Логін: admin, пароль стандартний.
+#      Налаштуй новий пароль для admin.
 #   3) Залий цей файл на роутер:
-#        scp mikrotik-failover.rsc admin@192.168.88.1:mikrotik-failover.rsc
+#        scp dhcp_failover_v1.rsc admin@192.168.88.1:dhcp_failover_v1.rsc
+#        (або будь-яким іншим зручним способом; можна навіть створити скрипт в Winbox і вставити код вручну)
 #   4) У терміналі роутера:
-#        /import file-name=mikrotik-failover.rsc verbose=yes
+#        /import file-name=dhcp_failover_v1.rsc verbose=yes
 #
 # ЧОМУ НЕ run-after-reset: цей скрипт — overlay поверх заводських defaults.
 # run-after-reset ЗАМІНЮЄ дефолтну конфігурацію (не доповнює), тому bridge,
@@ -109,6 +110,4 @@ add address=pool.ntp.org
 #   - висмикни кабель з ether1 -> за ~10 сек трафік переїде на ether2;
 #   - встроми назад -> через ~10 сек повернеться на ether1.
 #
-# Якщо в процесі експериментів пароль admin десь "злетів", його завжди
-# можна виставити наново:  /user set [find name=admin] password="12345678"
 # =============================================================================
