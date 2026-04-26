@@ -4,7 +4,7 @@
 # -----------------------------------------------------------------------------
 # Робочий цикл для тестування:
 #   1) Скинь на завод (роутер перезавантажиться):
-#        /system reset-configuration no-defaults=no skip-backup=yes
+#        /system reset-configuration no-defaults=no skip-backup=no
 #   2) Після ребуту підключись до 192.168.88.1 з LAN-порту (ether3..ether10).
 #      Логін: admin, пароль стандартний.
 #      Налаштуй новий пароль для admin.
