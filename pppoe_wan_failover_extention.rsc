@@ -9,8 +9,8 @@
 #   - ether3 = DHCP WAN3 (distance=3) — підключений до провайдера
 #
 # Порядок застосування:
-#   scp dhcp_pppoe_failover_v1.rsc admin@192.168.0.6:dhcp_pppoe_failover_v1.rsc
-#   /import file-name=dhcp_pppoe_failover_v1.rsc verbose=yes
+#   scp pppoe_wan_failover_extention.rsc admin@192.168.0.1:pppoe_wan_failover_extention.rsc
+#   /import file-name=pppoe_wan_failover_extention.rsc verbose=yes
 #
 # Логіка failover:
 #   RouterOS вибирає маршрут з найменшою дистанцією серед активних.
