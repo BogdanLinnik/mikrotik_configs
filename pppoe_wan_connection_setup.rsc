@@ -20,14 +20,18 @@
 
 # Для налаштування потібно заван
 
-# ---------- 1. PPPoE-клієнт ----------
+# ---------- 1. Відключення DHCP-клієнта на WAN-порту ----------
+# За замовчуванням MikroTik запускає DHCP на ether1; він конфліктує з PPPoE
+/ip dhcp-client set [find interface=ether1] disabled=yes
+
+# ---------- 2. PPPoE-клієнт ----------
 /interface pppoe-client add \
     name=pppoe-out1 \
     interface=ether1 \
     user="PPPOE_USER" \
     password="PPPOE_PASSWORD" \
     add-default-route=yes \
-    default-route-distance=1\ 
+    default-route-distance=1 \
     use-peer-dns=yes \
     disabled=no
 
