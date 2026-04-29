@@ -63,6 +63,44 @@ RouterOS автоматично перемикається на наступни
 
 ---
 
+### `general_speed_test.rsc`
+Перевіряє швидкість і якість інтернет-з'єднання засобами самого роутера.
+
+Що робить (три кроки):
+1. **Активний маршрут** — показує поточний default gateway і distance (корисно при failover, щоб одразу бачити який WAN активний)
+2. **Ping-латентність** — пінгує `1.1.1.1`, `8.8.8.8`, `google.com`; виводить середній RTT і packet loss по кожному хосту
+3. **Download** — завантажує тестовий файл ~100 МБ через `/tool fetch`, вимірює час і обчислює швидкість у Mbit/s
+
+Результати виводяться в консоль і записуються в `/log` (тег `SpeedTest`).
+
+**Передумова:** `/tool fetch` має бути дозволений у device-mode:
+```
+/system device-mode print
+/system device-mode update fetch=yes
+```
+Після другої команди натиснути кнопку Reset на пристрої протягом 5 хвилин для підтвердження.
+
+Запуск:
+```
+/import file-name=general_speed_test.rsc
+```
+
+Або як повторно викликаний скрипт:
+```
+/system script add name=speed-test source=[/file get [find name=general_speed_test.rsc] contents]
+/system script run speed-test
+```
+
+Налаштування — змінна `dlUrls` на початку файлу. Скрипт пробує URL по черзі і використовує перший доступний. Перевірити URL вручну:
+```
+/tool fetch url="<url>" dst-path=test.bin mode=http
+```
+
+Обмеження:
+- Upload не вимірюється (`/tool fetch` підтримує лише GET)
+
+---
+
 ### `dhcp_pppoe_failover_v0.rsc`
 Стара (v0) версія конфігурації зі змішаним підходом: DHCP на `ether1` і `ether3`, PPPoE на `ether2`. Містить відомі проблеми з надійністю перемикання та логуванням Netwatch. Збережено як референс.
 

@@ -13,11 +13,11 @@
 #
 # Як запустити:
 #   Спосіб А — разовий імпорт:
-#       /import file-name=speed_test.rsc verbose=yes
+#       /import file-name=general_speed_test.rsc verbose=yes
 #
 #   Спосіб Б — зберегти як скрипт і запускати за потребою:
 #       /system script add name=speed-test \
-#           source=[/file get [find name=speed_test.rsc] contents]
+#           source=[/file get [find name=general_speed_test.rsc] contents]
 #       /system script run speed-test
 #
 # Обмеження:
