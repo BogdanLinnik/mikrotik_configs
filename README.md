@@ -4,9 +4,26 @@
 
 ---
 
+## Структура проекту
+
+```
+cofigurations/
+    change_default_net.rsc          — зміна LAN-підмережі
+    pppoe_wan_connection_setup.rsc  — налаштування PPPoE WAN1
+    pppoe_wan_failover_extention.rsc — додавання DHCP WAN2/WAN3
+    dhcp_failover_v1.rsc            — failover для схеми 2×DHCP
+    dhcp_pppoe_failover_v0.rsc      — стара версія (референс)
+
+speed_tests/
+    general.rsc  — повний тест: маршрут, ping, download
+    basic.rsc    — мінімальний тест: лише Mbit/s
+```
+
+---
+
 ## Файли
 
-### `change_default_net.rsc`
+### `cofigurations/change_default_net.rsc`
 Змінює підмережу LAN з заводської `192.168.88.0/24` на `192.168.0.0/24`.
 
 Що робить:
@@ -20,7 +37,7 @@
 
 ---
 
-### `pppoe_wan_connection_setup.rsc`
+### `cofigurations/pppoe_wan_connection_setup.rsc`
 Налаштовує PPPoE-з'єднання на `ether1` як основний WAN (distance=1).
 
 Що робить:
@@ -33,7 +50,7 @@
 
 ---
 
-### `pppoe_wan_failover_extention.rsc`
+### `cofigurations/pppoe_wan_failover_extention.rsc`
 Розширення до попереднього скрипта — додає `ether2` (WAN2, distance=2) та `ether3` (WAN3, distance=3) через DHCP як резервні канали.
 
 Що робить:
@@ -50,7 +67,7 @@ RouterOS автоматично перемикається на наступни
 
 ---
 
-### `dhcp_failover_v1.rsc`
+### `cofigurations/dhcp_failover_v1.rsc`
 Актуальна версія failover-конфігурації для схеми **2×WAN через DHCP** (без PPPoE) поверх заводських налаштувань.
 
 Що робить:
@@ -63,7 +80,12 @@ RouterOS автоматично перемикається на наступни
 
 ---
 
-### `general_speed_test.rsc`
+### `cofigurations/dhcp_pppoe_failover_v0.rsc`
+Стара (v0) версія конфігурації зі змішаним підходом: DHCP на `ether1` і `ether3`, PPPoE на `ether2`. Містить відомі проблеми з надійністю перемикання та логуванням Netwatch. Збережено як референс.
+
+---
+
+### `speed_tests/general.rsc`
 Перевіряє швидкість і якість інтернет-з'єднання засобами самого роутера.
 
 Що робить (три кроки):
@@ -82,12 +104,12 @@ RouterOS автоматично перемикається на наступни
 
 Запуск:
 ```
-/import file-name=general_speed_test.rsc
+/import file-name=speed_tests/general.rsc
 ```
 
 Або як повторно викликаний скрипт:
 ```
-/system script add name=speed-test source=[/file get [find name=general_speed_test.rsc] contents]
+/system script add name=speed-test source=[/file get [find name=speed_tests/general.rsc] contents]
 /system script run speed-test
 ```
 
@@ -101,14 +123,14 @@ RouterOS автоматично перемикається на наступни
 
 ---
 
-### `basic_speed_test.rsc`
+### `speed_tests/basic.rsc`
 Мінімальна версія тесту швидкості — виводить лише одне число: поточна download-швидкість у Mbit/s.
 
-Призначений для автоматизації: виклику з інших скриптів, планувальника або моніторингу, де повний вивід `general_speed_test.rsc` зайвий.
+Призначений для автоматизації: виклику з інших скриптів, планувальника або моніторингу, де повний вивід `general.rsc` зайвий.
 
 Запуск:
 ```
-/import file-name=basic_speed_test.rsc
+/import file-name=speed_tests/basic.rsc
 ```
 
 Вивід — одне число:
@@ -122,11 +144,6 @@ RouterOS автоматично перемикається на наступни
 ```
 
 > **Примітка:** `/tool fetch` завжди друкує прогрес завантаження (status/downloaded/duration) — це поведінка RouterOS яку не можна вимкнути параметрами. При запуску через планувальник цей вивід не з'являється в терміналі.
-
----
-
-### `dhcp_pppoe_failover_v0.rsc`
-Стара (v0) версія конфігурації зі змішаним підходом: DHCP на `ether1` і `ether3`, PPPoE на `ether2`. Містить відомі проблеми з надійністю перемикання та логуванням Netwatch. Збережено як референс.
 
 ---
 
@@ -145,7 +162,7 @@ RouterOS автоматично перемикається на наступни
 ### Крок 1 — Зміна підмережі
 
 ```bash
-scp change_default_net.rsc admin@192.168.88.1:change_default_net.rsc
+scp cofigurations/change_default_net.rsc admin@192.168.88.1:change_default_net.rsc
 ```
 
 У терміналі роутера:
@@ -161,12 +178,12 @@ scp change_default_net.rsc admin@192.168.88.1:change_default_net.rsc
 
 ### Крок 2 — Налаштування PPPoE (WAN1)
 
-Відкрити файл `pppoe_wan_connection_setup.rsc` і замінити:
+Відкрити файл `cofigurations/pppoe_wan_connection_setup.rsc` і замінити:
 - `PPPOE_USER` → логін провайдера
 - `PPPOE_PASSWORD` → пароль провайдера
 
 ```bash
-scp pppoe_wan_connection_setup.rsc admin@192.168.0.1:pppoe_wan_connection_setup.rsc
+scp cofigurations/pppoe_wan_connection_setup.rsc admin@192.168.0.1:pppoe_wan_connection_setup.rsc
 ```
 
 ```
@@ -186,7 +203,7 @@ scp pppoe_wan_connection_setup.rsc admin@192.168.0.1:pppoe_wan_connection_setup.
 Підключити кабелі резервних провайдерів до `ether2` та `ether3`.
 
 ```bash
-scp pppoe_wan_failover_extention.rsc admin@192.168.0.1:pppoe_wan_failover_extention.rsc
+scp cofigurations/pppoe_wan_failover_extention.rsc admin@192.168.0.1:pppoe_wan_failover_extention.rsc
 ```
 
 ```
