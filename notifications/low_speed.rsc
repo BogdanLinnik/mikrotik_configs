@@ -1,14 +1,14 @@
 # =============================================================================
 # MikroTik RB4011iGS+5HacQ2HnD  |  RouterOS 7.2.7
-# Моніторинг швидкості — Slack-сповіщення при падінні нижче порогу
+# Моніторинг швидкості — Discord-сповіщення при падінні нижче порогу
 # =============================================================================
-# Вимірює download-швидкість і надсилає повідомлення у Slack якщо
+# Вимірює download-швидкість і надсилає повідомлення у Discord якщо
 # результат нижче speedThreshold Mbit/s.
 #
 # Передумови:
 #   - /tool fetch дозволений у device-mode (/system device-mode update fetch=yes)
-#   - Slack Incoming Webhook URL вставлений у змінну slackWebhook
-#     (створити на: https://api.slack.com/messaging/webhooks)
+#   - Discord Webhook URL вставлений у змінну discordWebhook
+#     (створити: Server Settings -> Integrations -> Webhooks -> New Webhook)
 #
 # Запуск вручну:
 #   /import file-name=notifications/low_speed.rsc
@@ -21,8 +21,8 @@
 # =============================================================================
 
 # ---- Параметри ---------------------------------------------------------------
-:local speedThreshold 50
-:local slackWebhook   "SLACK_WEBHOOK_URL"
+:local speedThreshold 20
+:local discordWebhook "https://discord.com/api/webhooks/:hook_id"
 :local dlUrls {
     "http://cachefly.cachefly.net/100mb.test";
     "http://speedtest-nl.belhost.com/100mb.bin";
@@ -68,18 +68,18 @@
 
 :log info ("SpeedMonitor: " . $dlSpeed . " Mbit/s  threshold=" . $speedThreshold)
 
-# ---- Slack-сповіщення --------------------------------------------------------
+# ---- Discord-сповіщення ------------------------------------------------------
 :if ($dlSpeed < $speedThreshold) do={
-    :local msg ("{\"text\":\"[MikroTik] Low speed: " . $dlSpeed . " Mbit/s (threshold: " . $speedThreshold . " Mbit/s) | " . [/system clock get date] . " " . [/system clock get time] . "\"}")
+    :local msg ("{\"content\":\"[MikroTik] Low speed: " . $dlSpeed . " Mbit/s (threshold: " . $speedThreshold . " Mbit/s) | " . [/system clock get date] . " " . [/system clock get time] . "\"}")
     :do {
-        /tool fetch url=$slackWebhook mode=https \
+        /tool fetch url=$discordWebhook mode=https \
             http-method=post \
             http-header-field="Content-Type: application/json" \
             http-data=$msg \
-            dst-path=slack_resp.tmp
-        :do { /file remove [find name=slack_resp.tmp] } on-error={}
-        :log warning ("SpeedMonitor: Slack notification sent (" . $dlSpeed . " Mbit/s)")
+            dst-path=discord_resp.tmp
+        :do { /file remove [find name=discord_resp.tmp] } on-error={}
+        :log warning ("SpeedMonitor: Discord notification sent (" . $dlSpeed . " Mbit/s)")
     } on-error={
-        :log error "SpeedMonitor: failed to send Slack notification"
+        :log error "SpeedMonitor: failed to send Discord notification"
     }
 }
