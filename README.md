@@ -17,6 +17,9 @@ cofigurations/
 speed_tests/
     general.rsc  — повний тест: маршрут, ping, download
     basic.rsc    — мінімальний тест: лише Mbit/s
+
+notifications/
+    low_speed.rsc  — Discord-сповіщення при падінні швидкості нижче порогу
 ```
 
 ---
@@ -144,6 +147,42 @@ RouterOS автоматично перемикається на наступни
 ```
 
 > **Примітка:** `/tool fetch` завжди друкує прогрес завантаження (status/downloaded/duration) — це поведінка RouterOS яку не можна вимкнути параметрами. При запуску через планувальник цей вивід не з'являється в терміналі.
+
+---
+
+### `notifications/low_speed.rsc`
+Вимірює download-швидкість і надсилає повідомлення у Discord якщо результат нижче порогу.
+
+Параметри на початку файлу:
+- `speedThreshold` — мінімально допустима швидкість у Mbit/s (за замовчуванням `50`)
+- `discordWebhook` — URL Discord Webhook (отримати: Server Settings → Integrations → Webhooks → New Webhook → Copy Webhook URL)
+
+Що робить:
+1. Завантажує тестовий файл ~100 МБ через `/tool fetch`, обчислює швидкість у Mbit/s
+2. Якщо результат нижче `speedThreshold` — надсилає повідомлення у Discord і пише `warning` у `/log`
+3. Завжди пише поточну швидкість у `/log` з тегом `SpeedMonitor` (незалежно від порогу)
+
+**Передумова:** `/tool fetch` має бути дозволений у device-mode (так само як для speed_tests).
+
+Запуск вручну:
+```
+/import file-name=notifications/low_speed.rsc
+```
+
+Автоматичний запуск через планувальник (наприклад, кожні 30 хвилин):
+```
+/system script add name=speed-monitor \
+    source=[/file get [find name=notifications/low_speed.rsc] contents]
+/system scheduler add name=speed-monitor interval=30m \
+    on-event="/system script run speed-monitor"
+```
+
+Переглянути лог:
+```
+/log print where message~"SpeedMonitor"
+```
+
+> **Примітка:** Discord Webhook URL є секретом — не комітьте файл з реальним URL у відкритий репозиторій.
 
 ---
 
