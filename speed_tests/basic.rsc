@@ -11,6 +11,7 @@
 
 :local dlUrls {
     "http://cachefly.cachefly.net/100mb.test";
+    "http://speedtest-nl.belhost.com/100mb.bin";
     "http://speedtest.tele2.net/100MB.zip";
 }
 :local tmpFile "sptest.tmp"
@@ -40,10 +41,10 @@
                 :set totalSec ($hh * 3600 + $mm * 60 + $ss)
             }
 
-            :local mbps 0
-            :if ($totalSec >= 1) do={ :set mbps (($actual * 8 / $totalSec) / 1000000) }
-            :put $mbps
-            :log info ("SpeedTest/basic: " . $mbps . " Mbit/s")
+            :local dlSpeed 0
+            :if ($totalSec >= 1) do={ :set dlSpeed ($actual * 8 / $totalSec / 1000000) }
+            :put $dlSpeed
+            :log info ("SpeedTest/basic: " . $dlSpeed . " Mbit/s")
             :set fetchOk true
         } on-error={
             :do { /file remove [find name=$tmpFile] } on-error={}
