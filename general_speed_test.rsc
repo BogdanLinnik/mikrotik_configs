@@ -52,15 +52,38 @@
 }
 
 # ---- 2. Ping-латентність -----------------------------------------------------
-# as-value у RouterOS 7 не виводить RTT у консоль і ненадійно повертає поля
-# через ->; ping без as-value друкує таблицю результатів сам по собі.
-# Програмна перевірка зв'язку тут не потрібна: якщо інтернету нема,
-# кроки 1 (немає активного route) або 3 (fetch fail) це покажуть.
+# as-value повертає масив — по одному елементу на пакет з полем "time"
+# (time type, мікросекунди). :put $r нічого не друкує бо масив не
+# конвертується в рядок, але foreach і -> працюють нормально.
 :put ""
 :put "[2/3] Ping-latency (3 packets):"
 :foreach h in=$pingHosts do={
-    :put ("    -- " . $h . " --")
-    /tool ping address=$h count=3
+    :local results [/tool ping address=$h count=3 as-value]
+    :local sent   0
+    :local recv   0
+    :local rttSum 0
+    :foreach pkt in=$results do={
+        :set sent ($sent + 1)
+        :local t ($pkt->"time")
+        :if ([:typeof $t] != "nothing") do={
+            :set recv ($recv + 1)
+            :local tStr [:tostr $t]
+            :local c1  [:find $tStr ":"]
+            :local c2  [:find $tStr ":" ($c1 + 1)]
+            :local dot [:find $tStr "."]
+            :if ($dot > $c2) do={
+                :local mm [:tonum [:pick $tStr ($c1 + 1) $c2]]
+                :local ss [:tonum [:pick $tStr ($c2 + 1) $dot]]
+                :local us [:tonum [:pick $tStr ($dot + 1) [:len $tStr]]]
+                :set rttSum ($rttSum + $mm * 60000 + $ss * 1000 + $us / 1000)
+            }
+        }
+    }
+    :local loss 0
+    :local avg  0
+    :if ($sent > 0) do={ :set loss (($sent - $recv) * 100 / $sent) }
+    :if ($recv > 0) do={ :set avg  ($rttSum / $recv) }
+    :put ("    " . $h . " -> avg=" . $avg . "ms  loss=" . $loss . "%")
 }
 
 # ---- 3. Download -------------------------------------------------------------
@@ -104,7 +127,7 @@
                 :put ("    >> Download: " . ($bps / 1000000) . " Mbit/s  (" . ($bps / 1000) . " Kbit/s)")
                 :log info ("SpeedTest: download=" . ($bps / 1000000) . " Mbit/s  server=" . $url . "  elapsed=" . $elapsedStr)
             } else={
-                :put "    Час < 1 с — test file is too small."
+                :put "    Time < 1 с — test file is too small."
                 :log warning "SpeedTest: elapsed < 1s — result unreliable"
             }
             :set fetchOk true
